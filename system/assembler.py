@@ -80,11 +80,11 @@ class Assembler:
 
         logger.debug('Initializing First Step')
         # First Step
+        self.step = 1
         for lineno, code, comment in self.lines:
             logger.debug('Processing line %d', lineno)
 
-            if len(code) == 0: # Comment only, list only
-                self.list(comment=comment)
+            if len(code) == 0: # Comment only, do nothing on first step
                 continue
 
             if len(code) == 1: # Label only
@@ -114,15 +114,52 @@ class Assembler:
             else:
                 raise AssemblyError('Assembly error on line {:d}: Too many things!!'.format(lineno))
 
+        logger.debug('Finished First Step')
+
+        logger.debug('Initializing Second Step')
+        # Second Step
+        self.step = 2
+        for lineno, code, comment in self.lines:
+            logger.debug('Processing line %d', lineno)
+
+            if len(code) == 0: # Comment only, list
+                self.list(line=lineno, comment=comment)
+
+            elif len(code) == 1: # Label only, list
+                self.list(line=lineno, address=self.instruction_counter, code=code, comment=comment)
+
+            elif len(code) <= 3: # [label] Operation and Operator
+                obj_code = self.process_code(lineno, code)
+                if obj_code is None:
+                    self.list(line=lineno, address=self.instruction_counter, code=code, comment=comment)
+                else:
+                    self.list(line=lineno, object=obj_code, address=self.instruction_counter, code=code, comment=comment)
+
+            elif len(code) == 3: # Label, Operation and Operator
+                obj_code = self.process_code(lineno, code[1:])
+                if obj_code is None:
+                    self.list(line=lineno, address=self.instruction_counter, code=code, comment=comment)
+                else:
+                    self.list(line=lineno, object=obj_code, address=self.instruction_counter, code=code, comment=comment)
+
+            else:
+                raise AssemblyError('Assembly error on line {:d}: Too many things!!'.format(lineno))
+
+
     def process_code(self, lineno, code):
         operation = code[0]
         if operation not in [*self.mnemonics_table, *self.pseudo_table]: # Unknown operation
             raise AssemblyError('Assembly error on line {:d}: Unknown operation "{}"'.format(lineno, operation))
 
         if '/' not in code[1]: # Label
-            if code[1] not in self.labels:
-                self.labels[code[1]] = None
-            operator = code[1]
+            if self.step == 1:
+                if code[1] not in self.labels:
+                    self.labels[code[1]] = None
+                operator = code[1]
+            elif self.step == 2:
+                if code[1] not in self.labels:
+                    raise AssemblyError('Assembly error on line {:d}: undefined label "{}"'.format(lineno, code[1]))
+                operator = self.labels[code[1]]
         else:
             try:
                 operator = int(code[1][1:], 16)
@@ -146,21 +183,28 @@ class Assembler:
                 if operator > 0xFF:
                     raise AssemblyError('Assembly error on line {:d}: operator out of range "{:0x}"'.format(lineno, operator))
                 self.instruction_counter += 1
+                return operator
 
         # Normal instruction
         else:
-            self.instruction_counter += self.mnemonics_table[operation][2]
+            self.instruction_counter += self.mnemonics_table[operation][1]
+            if self.step == 1:
+                return
 
-    def list(self, **args):
+            obj_code = self.mnemonics_table[operation][0] << 12 | operator
+            return obj_code
+
+
+    def list(self, **kwargs):
         if self.list_file is None:
             return
 
-        args['comment'] = '' if 'comment' not in args or args['comment'] == '' else '; ' + args['comment']
-        args['address'] = 0 if 'address' not in args else args['address']
-        args['object'] = 0 if 'object' not in args else args['object']
-        args['code'] = [] if 'code' not in args else args['code']
-        args['line'] = 0 if 'line' not in args else args['line']
+        comm = '; {:s}'.format(kwargs['comment']) if 'comment' in kwargs and kwargs['comment'] != '' else ''
+        addr = '{:-04X}'.format(kwargs['address']) if 'address' in kwargs else '    '
+        obj = '{:-6X}'.format(kwargs['object']) if 'object' in kwargs else '      '
+        code = '{:s}'.format(' '.join(kwargs['code'])) if 'code' in kwargs else ''
+        line = '{:-4d}'.format(kwargs['line']) if 'line' in kwargs else '    '
 
         with open(self.list_file, 'a') as f:
-            print('   {:-04x}   {:-6x}    {:-4x}   {:s} {:s}'.format(
-                args['address'], args['object'], args['line'], ' '.join(args['code']), args['comment']), file=f)
+            print('   {}   {}    {}   {} {}'.format(
+                addr, obj, line, code, comm), file=f)

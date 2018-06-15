@@ -6,6 +6,6 @@ interpreter = Interpreter()
 
 try:
     interpreter.start()
-except KeyboardInterrupt:
+except (KeyboardInterrupt, EOFError):
     print('bye!')
     sys.exit()

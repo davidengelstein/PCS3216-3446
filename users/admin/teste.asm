@@ -1,11 +1,10 @@
+@ /A123
 LABEL     MM    /123 ; commentop
         JZ   /289
-        JN   /BCD
+        JN   LABEL2
 
 LABEL2
     OS  /A2
-@ /A123
-K 4
+K /4
 
-LABEL2
 ; Comentariozao

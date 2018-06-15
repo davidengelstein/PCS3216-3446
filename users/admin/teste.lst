@@ -1,1 +1,10 @@
+teste.lst LIST FILE
 ADDRESS   OBJECT    LINE   SOURCE
+   a123                1   @ /A123 
+   a125     9123       2   LABEL MM /123 ; commentop
+   a127     1289       3   JZ /289 
+   a129     a129       4   JN LABEL2 
+   a129                6   LABEL2 
+   a12a     b0a2       7   OS /A2 
+   a12b        4       8   K /4 
+                      10    ; Comentariozao

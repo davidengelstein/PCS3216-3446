@@ -1,0 +1,9 @@
+teste.asm.labels LABEL TABLE FILE
+---------------------------------
+LABEL           VALUE
+LABEL            0100
+LABEL2           0106
+AREA_DADOS_1     1200
+C1               1214
+C2               1215
+C3               1216

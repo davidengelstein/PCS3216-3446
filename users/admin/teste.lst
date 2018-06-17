@@ -1,10 +1,17 @@
 teste.lst LIST FILE
+--------------------
 ADDRESS   OBJECT    LINE   SOURCE
-   a123                1   @ /A123 
-   a125     9123       2   LABEL MM /123 ; commentop
-   a127     1289       3   JZ /289 
-   a129     a129       4   JN LABEL2 
-   a129                6   LABEL2 
-   a12a     b0a2       7   OS /A2 
-   a12b        4       8   K /4 
-                      10    ; Comentariozao
+                       1   @ /0100 
+   0100     9123       2   LABEL MM /123 ; commentop
+   0102     1289       3   JZ /289 
+   0104     2106       4   JN LABEL2 
+   0106                6   LABEL2 
+   0106       B2       7   OS /2 
+   0107        4       8   K 4 
+                      10   ; Comentariozao
+                      15   @ /1200 ; Dados
+   1200               16   AREA_DADOS_1 $ 20 ; 20 bytes
+   1214        4      17   C1 K 4 
+   1215        F      18   C2 K /F 
+   1216        E      19   C3 K /E 
+                      21   # LABEL 

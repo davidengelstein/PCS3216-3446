@@ -1,8 +1,12 @@
-from ctypes import c_uint8
 import logging
+import coloredlogs
 
+from ctypes import c_uint8
+
+fmt = '[{levelname:7s}] {name:s}: {message:s}'
 logger = logging.getLogger(__name__)
-logger.setLevel(level=logging.DEBUG)
+coloredlogs.DEFAULT_FIELD_STYLES['levelname']['color'] = 'white'
+coloredlogs.install(level=logging.DEBUG, logger=logger, fmt=fmt, style='{')
 
 class VM:
     def __init__(self, banks=0xF, bank_size=0xFFF):

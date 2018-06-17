@@ -1,3 +1,4 @@
 passlib==1.7.1
 prompt-toolkit==2.0.2
 bcrypt==3.1.4
+coloredlogs==10.0

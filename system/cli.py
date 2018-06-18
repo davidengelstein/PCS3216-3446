@@ -4,7 +4,7 @@ import os
 import sys
 
 from .assembler import Assembler, AssemblyError
-from .VM import VM
+from .VM import VM, VMError
 
 from passlib.hash import bcrypt
 from prompt_toolkit import prompt
@@ -31,6 +31,7 @@ class Interpreter:
             '$ASM': 'Monta um arquivo ASM',
             '$END': 'Encerra o interpretador',
             '$LOGOUT': 'Volta para o login',
+            '$DEL': 'Marca um arquivo para remoção',
             '$DIR': 'Mostra os arquivos na pasta'
         }
 
@@ -90,6 +91,13 @@ class Interpreter:
 
                     self._asm(cmd[1])
 
+                elif cmd[0] == '$DEL':
+                    if len(cmd) < 2:
+                        print('Usage: $DEL <file>')
+                        continue
+
+                    self._del(cmd[1])
+
                 print()
 
     def _usage(self):
@@ -122,7 +130,6 @@ class Interpreter:
         print('Wrong Password')
         return False
 
-
     def _logout(self):
         self.current_user = None
         os.chdir(self.base_path)
@@ -149,13 +156,27 @@ class Interpreter:
 
     def _dir(self):
         for p in os.scandir():
-            print(p.name)
+            if not p.name.endswith('.to_delete'):
+                print(p.name)
 
-    def _del(self):
-        pass
+    def _del(self, filen):
+        found = False
 
-    def _run(self, file):
-        print('Running', file)
+        for f in os.scandir():
+            if f.name == filen:
+                os.rename(filen, filen + '.to_delete')
+                found = True
+                break
+
+        if not found:
+            print('Arquivo nao existe!')
+
+    def _run(self, filen):
+        try:
+            vm = VM()
+            vm.teste(filen)
+        except VMError as e:
+            print('Error:', e)
 
     def _asm(self, file):
         try:
@@ -165,5 +186,9 @@ class Interpreter:
             print('Error:', e)
 
     def _end(self):
-        print('bye!')
+        print('Cleaning up!')
+        for p in os.scandir():
+            if p.name.endswith('.to_delete'):
+                os.remove(p)
+        print('Finished! Bye!')
         sys.exit(0)

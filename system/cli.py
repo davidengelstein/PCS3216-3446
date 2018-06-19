@@ -27,7 +27,7 @@ class Interpreter:
         self.user_path = 'users'
 
         self.commands = {
-            '$RUN': 'Executa um arquivo',
+            '$RUN': 'Executa um arquivo OBJ',
             '$ASM': 'Monta um arquivo ASM',
             '$END': 'Encerra o interpretador',
             '$LOGOUT': 'Volta para o login',
@@ -47,7 +47,7 @@ class Interpreter:
                 elif cmd in ['r', 'register']:
                     self.register()
                 elif cmd == '$end':
-                    self._end()
+                    self.end()
                 else:
                     print('Command not found! (l)ogin or (r)egister')
 
@@ -82,7 +82,7 @@ class Interpreter:
                     break
 
                 elif cmd[0] == '$END':
-                    self._end()
+                    self.end()
 
                 elif cmd[0] == '$ASM':
                     if len(cmd) < 2:
@@ -185,7 +185,7 @@ class Interpreter:
         except AssemblyError as e:
             print('Error:', e)
 
-    def _end(self):
+    def end(self):
         print('Cleaning up!')
         for p in os.scandir():
             if p.name.endswith('.to_delete'):

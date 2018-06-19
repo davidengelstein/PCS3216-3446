@@ -2,6 +2,8 @@
 
 import logging
 import coloredlogs
+import glob
+import os
 
 from ctypes import c_uint8
 
@@ -17,7 +19,7 @@ class Assembler:
     # (Object Code, Size)
     mnemonics_table = {
         "JP": (0x0, 2), "JZ": (0x1, 2), "JN": (0x2, 2), "CN": (0x3, 1),
-        "+":  (0x4, 2), "-":  (0x5, 2), "*":  (0x6, 2), "/":  (0x7, 2),
+         "+": (0x4, 2),  "-": (0x5, 2),  "*": (0x6, 2),  "/": (0x7, 2),
         "LD": (0x8, 2), "MM": (0x9, 2), "SC": (0xA, 2), "OS": (0xB, 1),
         "IO": (0xC, 1),
     }
@@ -38,6 +40,7 @@ class Assembler:
         self.obj_code = []
         self.instruction_counter = 0
         self.initial_address = 0
+        self.current_object_file = 0
 
         try:
             with open(filen, 'r') as f:
@@ -77,6 +80,8 @@ class Assembler:
                 print('LABEL           VALUE', file=f)
 
         self.obj_file = self.filename + '.obj'
+        for f in glob.glob(self.obj_file + '.*'):
+            os.remove(f)
 
     def assemble(self):
         for self.step in [1, 2]:
@@ -127,7 +132,6 @@ class Assembler:
             self.dump_label_table()
             self.save_obj()
 
-
     def process_code(self, lineno, code, comment):
         operation = code[-2]
         if operation not in [*self.mnemonics_table, *self.pseudo_table]: # Unknown operation
@@ -142,14 +146,18 @@ class Assembler:
                 else:
                     raise
             except ValueError: # label
+                lb = code[-1].partition('+') if '+' in code[-1] else code[-1].partition('-') if '-' in code[-1] else [code[-1]]
                 if self.step == 1:
-                    if code[-1] not in self.labels:
-                        self.labels[code[-1]] = None
+                    if lb[0] not in self.labels:
+                        self.labels[lb[0]] = None
                     operator = None
                 elif self.step == 2:
-                    if self.labels[code[-1]] is None:
+                    if self.labels[lb[0]] is None:
                         raise AssemblyError('Assembly error on line {:d}: undefined label "{}"'.format(lineno, code[-1]))
-                    operator = self.labels[code[-1]]
+                    if len(lb) == 1:
+                        operator = self.labels[lb[0]]
+                    else:
+                        operator = self.labels[lb[0]] + int(lb[2]) if lb[1] == '+' else self.labels[lb[0]] - int(lb[2])
 
         # Pseudo instruction
         if operation in self.pseudo_table:
@@ -160,7 +168,12 @@ class Assembler:
                 if operator > 0xFFFF:
                     raise AssemblyError('Assembly error on line {:d}: operator out of range "{:0x}"'.format(lineno, operator))
                 self.list(line=lineno, code=code, comment=comment)
+                if self.step == 2 and self.instruction_counter != None: # New code block, save current
+                    self.save_obj()
+                    self.obj_code = []
+                self.initial_address = operator
                 self.instruction_counter = operator
+
             elif operation == '$':
                 if operator > 0xFFF:
                     raise AssemblyError('Assembly error on line {:d}: operator out of range "{:0x}"'.format(lineno, operator))
@@ -176,11 +189,14 @@ class Assembler:
                 if self.step == 2:
                     self.obj_code.append(c_uint8(operator))
                 self.instruction_counter += 1
+
             elif self.step == 2 and operation == '#':
                 if operator > 0xFFFF:
                     raise AssemblyError('Assembly error on line {:d}: operator out of range "{:0x}"'.format(lineno, operator))
                 self.list(line=lineno, code=code, comment=comment)
-                self.initial_address = operator
+                self.save_obj()
+                self.initial_address = 0x0006
+                self.obj_code = [c_uint8(operator >> 8), c_uint8(operator & 0xFF)]
 
         # Normal instruction
         else:
@@ -226,15 +242,23 @@ class Assembler:
         if self.step != 2:
             return
 
-        chk = c_uint8(0xFF)
-        with open(self.obj_file, 'w') as f:
-            print('{:02X} {:02X}'.format(self.initial_address >> 8, self.initial_address & 0xFF), end=' ', file=f)
-            print('{:02X}'.format(len(self.obj_code)), end=' ', file=f)
-            i = 3
-            for obj in self.obj_code:
-                print('{:02X}'.format(obj.value), end=' ', file=f)
-                chk.value ^= obj.value
-                i += 1
-                if i % 16 == 0:
-                    print('', file=f)
-            print('{:02X}'.format(chk.value), end='', file=f)
+        logger.debug('Saving object')
+
+        obj_codes = [self.obj_code[x:x+0xFF] for x in range(0, len(self.obj_code), 0xFF)] # Split into FF
+
+        pc = self.initial_address
+        for obj in obj_codes:
+            chk = c_uint8(0xFF)
+            with open(self.obj_file + '.{:d}'.format(self.current_object_file), 'w') as f:
+                print('{:02X} {:02X}'.format(pc >> 8, pc & 0xFF), end=' ', file=f)
+                print('{:02X}'.format(len(obj)), end=' ', file=f)
+                i = 3
+                for o in obj:
+                    print('{:02X}'.format(o.value), end=' ', file=f)
+                    chk.value ^= o.value
+                    i += 1
+                    pc += 1
+                    if i % 16 == 0:   # Break line every few elements to improve readability
+                        print('', file=f)
+                print('{:02X}'.format(chk.value), end='', file=f)
+                self.current_object_file += 1

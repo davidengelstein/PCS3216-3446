@@ -1,7 +1,8 @@
 import logging
 import coloredlogs
+import glob
 
-from ctypes import c_uint8, c_uint16, c_int16
+from ctypes import c_uint8, c_uint16, c_int8
 
 fmt = '[{levelname:7s}] {name:s}: {message:s}'
 logger = logging.getLogger(__name__)
@@ -38,15 +39,12 @@ class VM:
             0xA: self._subroutine_call,
             0xB: self._os_call,
             0xC: self._io,
-            0xD: self._reserved,
-            0xE: self._reserved,
-            0xF: self._reserved
         }
 
         self.main_memory = [[c_uint8(0) for i in range(bank_size)] for j in range(banks)] # 16 banks of 4096 bytes
         self._ci = c_uint16(0)
         self._pc = c_uint16(0)
-        self._acc = c_int16(0)
+        self._acc = c_int8(0)
 
         self._cb = c_uint8(0)
         self.indirect_mode = False
@@ -83,12 +81,31 @@ class VM:
     def current_bank(self, value):
         self._cb.value = value
 
-    def teste(self, file):
-        self.fetch()
-        self.decode_execute()
+    def teste(self, filen):
+        for fn in glob.glob(filen + '.*'):
+            print(fn)
+            with open(fn, 'r') as f:
+                bs = f.read().split()
+
+            print(bs)
+            addr = int(bs[0], 16) << 8 | int(bs[1], 16)
+            s = int(bs[2], 16)
+            logger.debug('Initial save address: %04X', addr)
+            logger.debug('Amount of bytes: %02X', s)
+
+            for b in bs[3:3+s]:
+                self.main_memory[addr >> 12][addr & 0xFFF].value = int(b, 16)
+                addr += 1
+
+        self.instruction_counter = self.main_memory[0][0x006].value << 8 | self.main_memory[0][0x007].value
+        for _ in range(4):
+            self.fetch()
+            self.decode_execute()
+
+        logger.debug('Value on 0x1203: %04X (acc = %02X)', self.main_memory[1][0x203].value, self.accumulator)
 
     def fetch(self):
-        logger.debug('Fetching Instruction')
+        logger.debug('Fetching Instruction %04X', self.instruction_counter)
         logger.debug('Bank %d - PC: %X', self.current_bank, self.instruction_counter)
         instruction_type = self.main_memory[self.current_bank][self.instruction_counter].value >> 4
         instruction_size = self.instructions_sizes[instruction_type]
@@ -115,59 +132,105 @@ class VM:
 
         self.instruction_decoders[instruction_type]()
 
+    def update_pc(self, operand):
+        if self.indirect_mode:
+            addr = self.main_memory[self.current_bank][operand].value << 8 | self.main_memory[self.current_bank][operand + 1].value
+            self.instruction_counter = addr & 0xFFF
+            self.current_bank = addr >> 12
+        else:
+            self.instruction_counter = operand
+
+        self.indirect_mode = False
+
+    def get_indirect_value(self, operand):
+        if self.indirect_mode:
+            addr = self.main_memory[self.current_bank][operand].value << 8 | self.main_memory[self.current_bank][operand + 1].value
+            addr &= 0xFFF
+        else:
+            addr = operand
+
+        self.indirect_mode = False
+
+        return self.main_memory[self.current_bank][addr].value
+
     def _jump(self):
         operand = self.current_instruction & 0xFFF
-        self.instruction_counter = operand
+        self.update_pc(operand)
 
     def _jump_if_zero(self):
         if self.accumulator != 0:
             return
 
         operand = self.current_instruction & 0xFFF
-        self.instruction_counter = operand
+        self.update_pc(operand)
 
     def _jump_if_negative(self):
         if self.accumulator < 0:
             return
 
         operand = self.current_instruction & 0xFFF
-        self.instruction_counter = operand
+        self.update_pc(operand)
 
     def _control(self):
-        pass
+        operand = (self.current_instruction & 0x0F00) >> 8
+        logger.debug('Control Operation {:d}'.format(operand))
+
+        if operand == 0: # Halt Machine
+            pass
+
+        elif operand == 1: # Return from Interrupt
+            pass
+
+        elif operand == 2: # Indirect
+            logger.debug('Activating Indirect Mode')
+            self.indirect_mode = True
+
+        else:
+            logger.warning('Unknown Control operation at 0x{:01X}{:03X}'.format(self.current_bank, self.instruction_counter))
 
     def _sum(self):
         operand = self.current_instruction & 0xFFF
-        self.accumulator += operand
+        self.accumulator += self.get_indirect_value(operand)
 
     def _subtract(self):
         operand = self.current_instruction & 0xFFF
-        self.accumulator -= operand
+        self.accumulator -= self.get_indirect_value(operand)
 
     def _multiply(self):
         operand = self.current_instruction & 0xFFF
-        self.accumulator *= operand
+        self.accumulator *= self.get_indirect_value(operand)
 
     def _divide(self):
         operand = self.current_instruction & 0xFFF
-        self.accumulator /= operand
+        self.accumulator /= self.get_indirect_value(operand)
 
     def _load(self):
         operand = self.current_instruction & 0xFFF
-        self.accumulator = self.main_memory[self.current_bank][operand]
+        self.accumulator = self.get_indirect_value(operand)
 
     def _store(self):
         operand = self.current_instruction & 0xFFF
-        self.main_memory[self.current_bank][operand] = self.accumulator
+
+        if self.indirect_mode:
+            addr = self.main_memory[self.current_bank][operand].value << 8 | self.main_memory[self.current_bank][operand + 1].value
+            self.instruction_counter = addr & 0xFFF
+            self.current_bank = addr >> 12
+        else:
+            addr = operand
+
+        self.indirect_mode = False
+
+        self.main_memory[self.current_bank][addr].value = self.accumulator
 
     def _subroutine_call(self):
         pass
 
     def _os_call(self):
+        logger.
         pass
 
     def _io(self):
-        operand = self.current_instruction &0x0F00 >> 8 # last nibble
+        operand = self.current_instruction & 0x0F00 >> 8 # last nibble
         op_type = operand >> 2
         device = operand & 0x3
 
@@ -179,12 +242,3 @@ class VM:
             pass
         elif op_type == 0b11: # Disable Interrupt
             pass
-
-    def _reserved(self):
-        logger.warning('Tried to execute reserved instruction')
-        logger.warning('This is probably not intendend and might mess the memory')
-        logger.warning('Press enter to continue and skip byte (Ctrl+C to exit)')
-        try:
-            input()
-        except (KeyboardInterrupt, EOFError):
-            raise VMError('Aborted after reserved instruction')

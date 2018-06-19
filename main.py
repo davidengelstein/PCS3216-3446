@@ -7,5 +7,5 @@ interpreter = Interpreter()
 try:
     interpreter.start()
 except (KeyboardInterrupt, EOFError):
-    print('bye!')
+    interpreter.end()
     sys.exit()

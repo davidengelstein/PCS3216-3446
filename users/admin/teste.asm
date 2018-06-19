@@ -1,21 +1,16 @@
-@ /0100
-LABEL   MM   /123 ; commentop
-        JZ   /289
-        JN   LABEL2
+        @ /0100
+LABEL   +    L0+2 ; commentop
+        -    L0+3
+        *    L0+4
+        CN   /2 ; Modo indireto
+        MM   L0
 
-LABEL2
-        OS  /2
-K 4
+L0      K    /12
+        K    /00
 
-; Comentariozao
-
-
-
-
-    @ /1200  ; Dados
-AREA_DADOS_1    $ 20     ; 20 bytes
-C1    K 4
-C2   K /F
-C3    K /E
-
-    # LABEL
+        K    /FF
+        K    /0E
+        K    2
+        @    /1200
+        K    0
+        # LABEL

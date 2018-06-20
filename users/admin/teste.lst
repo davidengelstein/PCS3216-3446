@@ -2,16 +2,23 @@ teste.lst LIST FILE
 --------------------
 ADDRESS   OBJECT    LINE   SOURCE
                        1   @ /0100 
-   0100     410B       2   LABEL + L0+2 ; commentop
-   0102     510C       3   - L0+3 
-   0104     610D       4   * L0+4 
-   0106       32       5   CN /2 ; Modo indireto
-   0107     9109       6   MM L0 
-   0109       12       8   L0 K /12 
-   010A        0       9   K /00 
-   010B       FF      11   K /FF 
-   010C        E      12   K /0E 
-   010D        2      13   K 2 
-                      14   @ /1200 
-   1200        0      15   K 0 
-                      16   # LABEL 
+   0100     410E       2   INIT + L0+2 ; commentop
+   0102     510F       3   - L0+3 
+   0104     6110       4   * L0+4 
+   0106     A112       5   SC SUB1 
+   0108       32       6   CN /2 ; Modo indireto
+   0109     910C       7   MM L0 
+   010B       30       8   CN /0 ; Halt Machine
+   010C       12      10   L0 K /12 
+   010D        0      11   K /00 
+   010E       FF      13   K /FF 
+   010F        E      14   K /0E 
+   0110        2      15   K 2 
+   0111        5      16   K 5 
+   0112               18   SUB1 $ 2 
+   0114     7111      19   / L0+5 
+   0116       32      20   CN /2 ; Modo indireto
+   0117      112      21   JP SUB1 
+                      23   @ /1200 
+   1200        0      24   K 0 
+                      26   # INIT 

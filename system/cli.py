@@ -26,6 +26,8 @@ class Interpreter:
         self.sys_path = 'system'
         self.user_path = 'users'
 
+        self.vm = VM()
+
         self.commands = {
             '$RUN': 'Executa um arquivo OBJ',
             '$ASM': 'Monta um arquivo ASM',
@@ -173,8 +175,8 @@ class Interpreter:
 
     def _run(self, filen):
         try:
-            vm = VM()
-            vm.teste(filen)
+            self.vm.load(filen)
+            self.vm.run()
         except VMError as e:
             print('Error:', e)
 

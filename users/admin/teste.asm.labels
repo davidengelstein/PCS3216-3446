@@ -1,5 +1,6 @@
 teste.asm.labels LABEL TABLE FILE
 ---------------------------------
 LABEL           VALUE
-LABEL            0100
-L0               0109
+INIT             0100
+L0               010C
+SUB1             0112

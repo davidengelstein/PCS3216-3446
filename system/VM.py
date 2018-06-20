@@ -48,6 +48,7 @@ class VM:
 
         self._cb = c_uint8(0)
         self.indirect_mode = False
+        self.running = True
 
     @property
     def current_instruction(self):
@@ -72,6 +73,7 @@ class VM:
     @accumulator.setter
     def accumulator(self, value):
         self._acc.value = value
+        logger.debug('Accumulator: %+03X (%d)', self._acc.value, self._acc.value)
 
     @property
     def current_bank(self):
@@ -81,13 +83,11 @@ class VM:
     def current_bank(self, value):
         self._cb.value = value
 
-    def teste(self, filen):
+    def load(self, filen):
         for fn in glob.glob(filen + '.*'):
-            print(fn)
             with open(fn, 'r') as f:
                 bs = f.read().split()
 
-            print(bs)
             addr = int(bs[0], 16) << 8 | int(bs[1], 16)
             s = int(bs[2], 16)
             logger.debug('Initial save address: %04X', addr)
@@ -97,12 +97,16 @@ class VM:
                 self.main_memory[addr >> 12][addr & 0xFFF].value = int(b, 16)
                 addr += 1
 
+    def run(self, step=False):
         self.instruction_counter = self.main_memory[0][0x006].value << 8 | self.main_memory[0][0x007].value
-        for _ in range(4):
+        self.running = True
+        while self.running:
             self.fetch()
             self.decode_execute()
+            if step:
+                input()
 
-        logger.debug('Value on 0x1203: %04X (acc = %02X)', self.main_memory[1][0x203].value, self.accumulator)
+        logger.debug('Value on 0x1200: %04X (acc = %02X)', self.main_memory[1][0x200].value, self.accumulator)
 
     def fetch(self):
         logger.debug('Fetching Instruction %04X', self.instruction_counter)
@@ -176,7 +180,12 @@ class VM:
         logger.debug('Control Operation {:d}'.format(operand))
 
         if operand == 0: # Halt Machine
-            pass
+            logger.debug('Machine Halted! Press ctrl+C to interrupt execution!')
+            try:
+                while True:
+                    pass
+            except KeyboardInterrupt:
+                self.running = False
 
         elif operand == 1: # Return from Interrupt
             pass
@@ -202,7 +211,7 @@ class VM:
 
     def _divide(self):
         operand = self.current_instruction & 0xFFF
-        self.accumulator /= self.get_indirect_value(operand)
+        self.accumulator //= self.get_indirect_value(operand)
 
     def _load(self):
         operand = self.current_instruction & 0xFFF
@@ -213,24 +222,30 @@ class VM:
 
         if self.indirect_mode:
             addr = self.main_memory[self.current_bank][operand].value << 8 | self.main_memory[self.current_bank][operand + 1].value
-            self.instruction_counter = addr & 0xFFF
-            self.current_bank = addr >> 12
+            bank = addr >> 12
+            addr &= 0xFFF
         else:
+            bank = self.current_bank
             addr = operand
 
         self.indirect_mode = False
 
-        self.main_memory[self.current_bank][addr].value = self.accumulator
+        self.main_memory[bank][addr].value = self.accumulator
 
     def _subroutine_call(self):
-        pass
+        operand = self.current_instruction & 0xFFF
+        next_instr = self.instruction_counter
+
+        self.main_memory[self.current_bank][operand].value = next_instr >> 8
+        self.main_memory[self.current_bank][operand + 1].value = next_instr & 0xFF
+
+        self.instruction_counter = operand + 2
 
     def _os_call(self):
-        logger.
-        pass
+        logger.warning('OS call not implemented, skipping')
 
     def _io(self):
-        operand = self.current_instruction & 0x0F00 >> 8 # last nibble
+        operand = (self.current_instruction & 0x0F00) >> 8 # last nibble
         op_type = operand >> 2
         device = operand & 0x3
 

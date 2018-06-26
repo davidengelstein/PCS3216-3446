@@ -1,13 +1,14 @@
 import logging
 import coloredlogs
 import glob
+import sys
 
 from ctypes import c_uint8, c_uint16, c_int8
 
 fmt = '[{levelname:7s}] {name:s}: {message:s}'
 logger = logging.getLogger(__name__)
 coloredlogs.DEFAULT_FIELD_STYLES['levelname']['color'] = 'white'
-coloredlogs.install(level=logging.DEBUG, logger=logger, fmt=fmt, style='{')
+coloredlogs.install(level=logging.INFO, logger=logger, fmt=fmt, style='{')
 
 class VMError(Exception):
     pass
@@ -42,29 +43,51 @@ class VM:
         }
 
         self.main_memory = [[c_uint8(0) for i in range(bank_size)] for j in range(banks)] # 16 banks of 4096 bytes
+        self._ri = c_uint16(0)
         self._ci = c_uint16(0)
-        self._pc = c_uint16(0)
         self._acc = c_int8(0)
 
         self._cb = c_uint8(0)
         self.indirect_mode = False
         self.running = True
 
+        self.io_devices = [
+            (sys.stdin.buffer, sys.stdout.buffer),
+            [None, None],
+            [None, None],
+            [None, None],
+        ]
+
+        logger.debug('Loading loader')
+        with open('system/loader.obj.0', 'r') as f:
+            bs = f.read().split()
+
+            addr = int(bs[0], 16) << 8 | int(bs[1], 16)
+            s = int(bs[2], 16)
+            logger.debug('Initial loader save address: %04X', addr)
+            logger.debug('Amount of bytes: %02X', s)
+
+            for b in bs[3:3+s]:
+                self.main_memory[addr >> 12][addr & 0xFFF].value = int(b, 16)
+                addr += 1
+        logger.debug('Loader loaded')
+
+
     @property
     def current_instruction(self):
-        return self._ci.value
+        return self._ri.value
 
     @current_instruction.setter
     def current_instruction(self, value):
-        self._ci.value = value
+        self._ri.value = value
 
     @property
     def instruction_counter(self):
-        return self._pc.value
+        return self._ci.value
 
     @instruction_counter.setter
     def instruction_counter(self, value):
-        self._pc.value = value
+        self._ci.value = value
 
     @property
     def accumulator(self):
@@ -84,21 +107,22 @@ class VM:
         self._cb.value = value
 
     def load(self, filen):
-        for fn in glob.glob(filen + '.*'):
-            with open(fn, 'r') as f:
-                bs = f.read().split()
+        logger.debug('Loading file to memory')
+        for fn in glob.glob(filen + '.bin.*'):
+            logger.debug('Changing file - %s', fn)
+            self.io_devices[1][0] = open(fn, 'r')
+            self.instruction_counter = 0x0000 # loader starts at 0
 
-            addr = int(bs[0], 16) << 8 | int(bs[1], 16)
-            s = int(bs[2], 16)
-            logger.debug('Initial save address: %04X', addr)
-            logger.debug('Amount of bytes: %02X', s)
+            self.running = True
+            while self.running:
+                self.fetch()
+                self.decode_execute()
 
-            for b in bs[3:3+s]:
-                self.main_memory[addr >> 12][addr & 0xFFF].value = int(b, 16)
-                addr += 1
+            self.io_devices[1][0].close()
+            self.io_devices[1][0] = None
 
     def run(self, step=False):
-        self.instruction_counter = self.main_memory[0][0x006].value << 8 | self.main_memory[0][0x007].value
+        self.instruction_counter = self.main_memory[0][0x022].value << 8 | self.main_memory[0][0x023].value
         self.running = True
         while self.running:
             self.fetch()
@@ -180,7 +204,7 @@ class VM:
         logger.debug('Control Operation {:d}'.format(operand))
 
         if operand == 0: # Halt Machine
-            logger.debug('Machine Halted! Press ctrl+C to interrupt execution!')
+            logger.warning('Machine Halted! Press ctrl+C to interrupt execution!')
             try:
                 while True:
                     pass
@@ -222,6 +246,8 @@ class VM:
 
         if self.indirect_mode:
             addr = self.main_memory[self.current_bank][operand].value << 8 | self.main_memory[self.current_bank][operand + 1].value
+            if addr < 0x0100:
+                logger.warning('Trying to write to memory area before 0x0100')
             bank = addr >> 12
             addr &= 0xFFF
         else:
@@ -230,6 +256,7 @@ class VM:
 
         self.indirect_mode = False
 
+        logger.debug('Writing to memory bank %d, address 0x%03X, value %02X', bank, addr, self.accumulator)
         self.main_memory[bank][addr].value = self.accumulator
 
     def _subroutine_call(self):
@@ -242,7 +269,21 @@ class VM:
         self.instruction_counter = operand + 2
 
     def _os_call(self):
-        logger.warning('OS call not implemented, skipping')
+        operand = (self.current_instruction & 0x0F00) >> 8 # last nibble
+
+        logger.debug('Receive OS call %1X', operand)
+
+        if operand == 0b0000: # Dump current state to stdout
+            uacc = c_uint8(self._acc.value).value
+            sacc = self._acc.value
+
+            print('-- Current VM State')
+            print('ACC => {0: #05x} | {0: 04d} | {1:#04x} | {1:03d}'.format(sacc, uacc))
+            print('CI  => {0: #05x} | {0: 04d}'.format(self.instruction_counter))
+        elif operand == 0b1111: # Finish execution
+            self.running = False
+        else:
+            logger.warning('OS call %01X not implemented, skipping', operand)
 
     def _io(self):
         operand = (self.current_instruction & 0x0F00) >> 8 # last nibble
@@ -250,9 +291,18 @@ class VM:
         device = operand & 0x3
 
         if op_type == 0b00: # Get data
-            pass
+            if self.io_devices[device][0] is None:
+                raise VMError('Tried to get data from inexistent device')
+            try:
+                self.accumulator = ord(self.io_devices[device][0].read(1))
+            except TypeError:
+                logger.warning('TypeError!')
+                pass
         elif op_type == 0b01: # Put data
-            pass
+            if self.io_devices[device][1] is None:
+                raise VMError('Tried to put data on inexistent device')
+            v = self.accumulator.to_bytes(1, 'big')
+            self.io_devices[device][1].write(v)
         elif op_type == 0b10: # Enable Interrupt
             pass
         elif op_type == 0b11: # Disable Interrupt

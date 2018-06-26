@@ -10,7 +10,7 @@ from ctypes import c_uint8
 fmt = '[{levelname:7s}] {name:s}: {message:s}'
 logger = logging.getLogger(__name__)
 coloredlogs.DEFAULT_FIELD_STYLES['levelname']['color'] = 'white'
-coloredlogs.install(level=logging.DEBUG, logger=logger, fmt=fmt, style='{')
+coloredlogs.install(level=logging.INFO, logger=logger, fmt=fmt, style='{')
 
 class AssemblyError(Exception):
     pass
@@ -167,6 +167,8 @@ class Assembler:
             if operation == '@':
                 if operator > 0xFFFF:
                     raise AssemblyError('Assembly error on line {:d}: operator out of range "{:0x}"'.format(lineno, operator))
+                elif operator < 0x0100:
+                    raise AssemblyError('Assembly error on line {:d}: memory area before 0x0100 should never be accessed'.format(lineno))
                 self.list(line=lineno, code=code, comment=comment)
                 if self.step == 2 and self.instruction_counter != None: # New code block, save current
                     self.save_obj()
@@ -195,7 +197,7 @@ class Assembler:
                     raise AssemblyError('Assembly error on line {:d}: operator out of range "{:0x}"'.format(lineno, operator))
                 self.list(line=lineno, code=code, comment=comment)
                 self.save_obj()
-                self.initial_address = 0x0006
+                self.initial_address = 0x0022
                 self.obj_code = [c_uint8(operator >> 8), c_uint8(operator & 0xFF)]
 
         # Normal instruction
@@ -250,15 +252,24 @@ class Assembler:
         for obj in obj_codes:
             chk = c_uint8(0xFF)
             with open(self.obj_file + '.{:d}'.format(self.current_object_file), 'w') as f:
-                print('{:02X} {:02X}'.format(pc >> 8, pc & 0xFF), end=' ', file=f)
-                print('{:02X}'.format(len(obj)), end=' ', file=f)
-                i = 3
-                for o in obj:
-                    print('{:02X}'.format(o.value), end=' ', file=f)
-                    chk.value ^= o.value
-                    i += 1
-                    pc += 1
-                    if i % 16 == 0:   # Break line every few elements to improve readability
-                        print('', file=f)
-                print('{:02X}'.format(chk.value), end='', file=f)
-                self.current_object_file += 1
+                with open(self.obj_file + '.bin.{:d}'.format(self.current_object_file), 'wb') as fb:
+                    fb.write(pc.to_bytes(2, 'big'))
+                    fb.write((len(obj) & 0xFF).to_bytes(1, 'big'))
+                    print('{:02X} {:02X}'.format(pc >> 8, pc & 0xFF), end=' ', file=f)
+                    print('{:02X}'.format(len(obj)), end=' ', file=f)
+
+                    i = 3
+                    for o in obj:
+                        fb.write((o.value & 0xFF).to_bytes(1, 'big'))
+                        print('{:02X}'.format(o.value), end=' ', file=f)
+
+                        chk.value ^= o.value
+                        i += 1
+                        pc += 1
+                        if i % 16 == 0:   # Break line every few elements to improve readability
+                            print('', file=f)
+
+                    fb.write((chk.value & 0xFF).to_bytes(1, 'big'))
+                    print('{:02X}'.format(chk.value), end='', file=f)
+
+                    self.current_object_file += 1

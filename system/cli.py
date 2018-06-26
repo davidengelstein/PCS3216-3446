@@ -76,7 +76,7 @@ class Interpreter:
                         print('Usage: $RUN <file>')
                         continue
 
-                    self._run(cmd[1])
+                    self._run(cmd[1], len(cmd) >= 3 and cmd[2] == 'step')
 
                 elif cmd[0] == '$LOGOUT':
                     self._logout()
@@ -173,10 +173,10 @@ class Interpreter:
         if not found:
             print('Arquivo nao existe!')
 
-    def _run(self, filen):
+    def _run(self, filen, step):
         try:
             self.vm.load(filen)
-            self.vm.run()
+            self.vm.run(step)
         except VMError as e:
             print('Error:', e)
 

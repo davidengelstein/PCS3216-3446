@@ -115,3 +115,6 @@ venv.bak/
 
 *.lst
 *.obj
+*.obj.*
+*.labels
+!loader.*

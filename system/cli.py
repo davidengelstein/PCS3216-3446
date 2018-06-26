@@ -184,6 +184,7 @@ class Interpreter:
         try:
             asm = Assembler(file)
             asm.assemble()
+            print('Assembly terminado!')
         except AssemblyError as e:
             print('Error:', e)
 

@@ -62,6 +62,8 @@ class VM:
             [None, None],
         ]
 
+        self.loading = False
+
         logger.debug('Loading loader')
         with open('system/loader.obj.0', 'r') as f:
             bs = f.read().split()
@@ -111,10 +113,11 @@ class VM:
         self._cb.value = value
 
     def load(self, filen):
+        self.loading = True
         logger.debug('Loading file to memory')
         for fn in glob.glob(filen + '.bin.*'):
             logger.debug('Changing file - %s', fn)
-            self.io_devices[1][0] = open(fn, 'r')
+            self.io_devices[1][0] = open(fn, 'rb')
             self.instruction_counter = 0x0000 # loader starts at 0
 
             self.running = True
@@ -124,6 +127,8 @@ class VM:
 
             self.io_devices[1][0].close()
             self.io_devices[1][0] = None
+
+        self.loading = False
 
     def run(self, step=False):
         self.instruction_counter = self.main_memory[0][0x022].value << 8 | self.main_memory[0][0x023].value
@@ -250,7 +255,7 @@ class VM:
 
         if self.indirect_mode:
             addr = self.main_memory[self.current_bank][operand].value << 8 | self.main_memory[self.current_bank][operand + 1].value
-            if addr < 0x0100:
+            if addr < 0x0100 and not self.loading:
                 logger.warning('Trying to write to memory area before 0x0100')
             bank = addr >> 12
             addr &= 0xFFF

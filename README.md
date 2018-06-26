@@ -64,7 +64,12 @@ específica, em assembly, com os seguintes mnemônicos possíveis:
 * `SC /xxx` - Chamada de Subrotina - salva o conteúdo atual do contador de instruções em xxx e xxx+1 e desvia para xxx+2
 
 * `OS /x  ` - Chamada de Sistema Operacional - o nibble x define a chamada:
-    * `x = /0` - Mostra o estado atual (acumulador e contador de instruções) da Máquina Virtual na tela.
+    * `x = /0` - Mostra o estado atual (acumulador e contador de instruções) da Máquina Virtual na tela, no formato:
+    ```
+    -- Current VM State
+    ACC =>  [HEXA COM SINAL] |  [DECIMAL COM SINAL] | [HEXA SEM SINAL] |  [DECIMAL SEM SINAL]
+    CI  =>  [HEXA SEM SINAL] |  [DECIMAL SEM SINAL]
+    ```
     * `x = /F` - Devolve o controle para o Interpretador de Comandos, encerrando a execução do programa
     * Outras instruções não foram implementadas e serão ignoradas
 
@@ -200,7 +205,7 @@ ONE     K   1
         # INIT
 ```
 
-E esses são seu arquivos de lista e tabela de labels:
+E esses são seu arquivos de lista e tabela de labels, como pode ser visto, o loader ocupa as posições de memória de 0x000 a 0x021 do banco 0:
 
 ```
 loader.lst LIST FILE
@@ -250,12 +255,202 @@ se deve colocar os números .X após .obj, isso é tratado automaticamente pela 
 todos eles serão carregados pelo loader.
 
 > A opção `step` pode ser usada para executar uma instrução de cada vez, sendo necessário
-> apertar enter para continuar, porém ela só útil se o debug estiver ativado
+> apertar enter para continuar, porém ela só útil se o debug estiver ativado.
 
 ### Dumper
 
 ## Testes
 
+Para testar o funcionamento do Sistema, foram utilizados alguns programas de teste, todos disponíveis na pasta do usuário `user`.
+
+* `n_quadrado.asm` - calcula o quadrado de um numero
+
+```arm
+; n_quadrado.asm
+        @   /0100
+INIC    LD  UM     ; Inicializa as variaveis
+        MM  CONT   ; com o valor 1
+        MM  IMPAR
+        MM  N+1
+
+LOOP    LD  CONT   ; Carrega o contador e verifica
+        -   N      ; se ja e igual N
+        JZ  FORA   ; Se sim, encerra
+        LD  CONT   ; Pega o contador
+        +   UM     ; Soma 1
+        MM  CONT   ; Devolve
+        LD  IMPAR  ; Coloca o proximo numero impar
+        +   DOIS
+        MM  IMPAR
+        +   N+1    ; E soma no resultado
+        MM  N+1
+        JP  LOOP
+
+FORA    LD  N+1    ; Resultado esta em N+1
+        OS  /0     ; Mostra o resultado
+        CN  /0     ; Halt Machine
+
+        @ /0200    ; Area de Dados
+UM      K   01
+DOIS    K   02
+IMPAR   K   0
+N       K   4      ; Valor cujo quadrado será calculado
+        K   0
+CONT    K   0
+
+        # INIC
+```
+
+```
+n_quadrado.lst LIST FILE
+-------------------------
+ADDRESS   OBJECT    LINE   SOURCE
+                       1   ; n_quadrado.asm
+                       2   @ /0100
+   0100     8200       3   INIC LD UM ; Inicializa as variaveis
+   0102     9205       4   MM CONT ; com o valor 1
+   0104     9202       5   MM IMPAR
+   0106     9204       6   MM N+1
+   0108     8205       8   LOOP LD CONT ; Carrega o contador e verifica
+   010A     5203       9   - N ; se ja e igual N
+   010C     1120      10   JZ FORA ; Se sim, encerra
+   010E     8205      11   LD CONT ; Pega o contador
+   0110     4200      12   + UM ; Soma 1
+   0112     9205      13   MM CONT ; Devolve
+   0114     8202      14   LD IMPAR ; Coloca o proximo numero impar
+   0116     4201      15   + DOIS
+   0118     9202      16   MM IMPAR
+   011A     4204      17   + N+1 ; E soma no resultado
+   011C     9204      18   MM N+1
+   011E      108      19   JP LOOP
+   0120     8204      21   FORA LD N+1 ; Resultado esta em N+1
+   0122       B0      22   OS /0 ; Mostra o resultado
+   0123       30      23   CN /0 ; Halt Machine
+                      25   @ /0200 ; Area de Dados
+   0200        1      26   UM K 01
+   0201        2      27   DOIS K 02
+   0202        0      28   IMPAR K 0
+   0203        4      29   N K 4
+   0204        0      30   K 0
+   0205        0      31   CONT K 0
+                      33   # INIC
+```
+
+```
+n_quadrado.asm.labels LABEL TABLE FILE
+--------------------------------------
+LABEL           VALUE
+INIC             0100
+UM               0200
+CONT             0205
+IMPAR            0202
+N                0203
+LOOP             0108
+FORA             0120
+DOIS             0201
+```
+
+Ao executá-lo, percebe-se que o acumulador acabou com o valor 16, como esperado
+
+```
+user users\user >> $ASM n_quadrado.asm
+Assembly terminado!
+
+user users\user >> $RUN n_quadrado.obj
+-- Current VM State
+ACC =>  0x10 |  016 | 0x10 | 016
+CI  =>  0x123 |  291
+[WARNING] system.VM: Machine Halted! Press ctrl+C to interrupt execution!
+
+user users\user >>
+```
+
+* `teste.asm` - programa que testa todas as operações aritméticas e usa uma chamada de subrotina e modo indireto
+
+```
+        @    /0100
+INIT    +    L0+2 ; ACC = FF
+        -    L0+3 ; ACC = F1
+        *    L0+4 ; ACC = E2
+        SC   SUB1 ; Teste subrotina
+        CN   /2   ; Modo indireto
+        MM   L0
+        OS   /0   ; Show data
+        CN   /0   ; Halt Machine
+
+L0      K    /12
+        K    /00
+
+        K    /FF
+        K    /0E
+        K    2
+        K    5
+
+SUB1    $    2
+        /    L0+5 ; ACC = FA
+        CN   /2   ; Modo indireto
+        JP   SUB1
+
+        @    /1200
+        K    0
+
+        # INIT
+```
+
+```
+teste.lst LIST FILE
+--------------------
+ADDRESS   OBJECT    LINE   SOURCE
+                       1   @ /0100
+   0100     410F       2   INIT + L0+2 ; ACC = FF
+   0102     5110       3   - L0+3 ; ACC = F1
+   0104     6111       4   * L0+4 ; ACC = E2
+   0106     A113       5   SC SUB1 ; Teste subrotina
+   0108       32       6   CN /2 ; Modo indireto
+   0109     910D       7   MM L0
+   010B       B0       8   OS /0 ; Show data
+   010C       30       9   CN /0 ; Halt Machine
+   010D       12      11   L0 K /12
+   010E        0      12   K /00
+   010F       FF      14   K /FF
+   0110        E      15   K /0E
+   0111        2      16   K 2
+   0112        5      17   K 5
+   0113               19   SUB1 $ 2
+   0115     7112      20   / L0+5 ; ACC = FA
+   0117       32      21   CN /2 ; Modo indireto
+   0118      113      22   JP SUB1
+                      24   @ /1200
+   1200        0      25   K 0
+                      27   # INIT
+```
+
+```
+teste.asm.labels LABEL TABLE FILE
+---------------------------------
+LABEL           VALUE
+INIT             0100
+L0               010D
+SUB1             0113
+```
+
+Ao executá-lo:
+
+```
+user users\user >> $ASM teste.asm
+Assembly terminado!
+
+user users\user >> $RUN teste.obj
+-- Current VM State
+ACC => -0x06 | -006 | 0xfa | 250
+CI  =>  0x10c |  268
+[WARNING] system.VM: Machine Halted! Press ctrl+C to interrupt execution!
+
+user users\user >>
+```
+
 ## Diagramas
+
+Diagrama Geral de funcionamento
 
 ## Arquivos

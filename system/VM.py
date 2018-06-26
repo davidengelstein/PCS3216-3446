@@ -8,7 +8,11 @@ from ctypes import c_uint8, c_uint16, c_int8
 fmt = '[{levelname:7s}] {name:s}: {message:s}'
 logger = logging.getLogger(__name__)
 coloredlogs.DEFAULT_FIELD_STYLES['levelname']['color'] = 'white'
-coloredlogs.install(level=logging.INFO, logger=logger, fmt=fmt, style='{')
+
+if len(sys.argv) >= 2 and sys.argv[1] in ['-d', '--debug']:
+    coloredlogs.install(level=logging.DEBUG, logger=logger, fmt=fmt, style='{')
+else:
+    coloredlogs.install(level=logging.WARNING, logger=logger, fmt=fmt, style='{')
 
 class VMError(Exception):
     pass

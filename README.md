@@ -116,9 +116,14 @@ Os comandos possiveis são:
 * `$LOGOUT`: Volta para o login
 * `$END`: Encerra o interpretador
 
+> É possível mostrar outputs de debug de todos os programas inicializando o sistema
+> com a flag -d: `python main.py -d`
+
 ### Montador
 
-O montador pode ser chamado com o comando `$ASM <nome_do_arquivo.asm>`, ele gera o código objeto do arquivo asm, além de um arquivo de lista e um arquivo com a tabela de labels, para que possam ser consultados.
+O montador pode ser chamado com o comando `$ASM <nome_do_arquivo.asm>`, ele gera o
+código objeto do arquivo asm, além de um arquivo de lista e um arquivo com a tabela de
+labels, para que possam ser consultados.
 
 Exemplo:
 
@@ -132,18 +137,6 @@ user users\user >> $DIR
 teste.asm
 
 user users\user >> $ASM teste.asm
-[DEBUG  ] system.assembler: Initializing Assembler
-[DEBUG  ] system.assembler: Base filename: teste
-[DEBUG  ] system.assembler: Preprocessing file
-[DEBUG  ] system.assembler: Finished preprocessing
-[DEBUG  ] system.assembler: Initializing Step 1
-[DEBUG  ] system.assembler: Finished Step 1
-[DEBUG  ] system.assembler: Initializing Step 2
-[DEBUG  ] system.assembler: Saving object
-[DEBUG  ] system.assembler: Saving object
-[DEBUG  ] system.assembler: Saving object
-[DEBUG  ] system.assembler: Finished Step 2
-[DEBUG  ] system.assembler: Saving object
 
 user users\user >> $DIR
 teste.asm
@@ -168,9 +161,101 @@ simbólica e transformados em código objeto absoluto e são carregados na
 memória da máquina virtual assim que ela é inicializada, estando disponíveis
 na interface de linha de comando.
 
-* Loader
-* Dumper
+### Loader
+
+O loader foi escrito na própria linguagem simbólica especificada acima e montado pelo
+assembler também especificado acima, seu código-fonte é o seguinte:
+
+```arm
+; loader.asm
+        @   /0000
+INIT    IO  /1        ; Get Data from device
+        MM  IADDR     ; Save first byte of initial address
+        IO  /1
+        MM  IADDR+1   ; Save second byte of initial address
+        IO  /1
+        MM  SIZE      ; Save size
+
+LOOP    IO  /1        ; Read byte from file
+        CN  /2        ; Activate Indirect Mode
+        MM  IADDR     ; Indirect move to current address
+
+        LD  IADDR+1   ; Get current address
+        +   ONE       ; Sum 1
+        MM  IADDR+1   ; Put it back
+
+        LD  SIZE      ; Get size
+        -   ONE       ; Subtract 1
+        MM  SIZE      ; Put it back
+
+        JZ  END       ; Finish if size = 0
+        JP  LOOP
+
+END     OS  /F        ; End Program
+
+IADDR   K   0
+        K   0
+SIZE    K   0
+ONE     K   1
+        # INIT
+```
+
+E esses são seu arquivos de lista e tabela de labels:
+
+```
+loader.lst LIST FILE
+---------------------
+ADDRESS   OBJECT    LINE   SOURCE
+                       1   @ /0000
+   0000       C1       2   INIT IO /1 ; Get Data from device
+   0001     901E       3   MM IADDR ; Save first byte of initial address
+   0003       C1       4   IO /1
+   0004     901F       5   MM IADDR+1 ; Save second byte of initial address
+   0006       C1       6   IO /1
+   0007     9020       7   MM SIZE ; Save size
+   0009       C1       9   LOOP IO /1 ; Read byte from file
+   000A       32      10   CN /2 ; Activate Indirect Mode
+   000B     901E      11   MM IADDR ; Indirect move to current address
+   000D     801F      13   LD IADDR+1 ; Get current address
+   000F     4021      14   + ONE ; Sum 1
+   0011     901F      15   MM IADDR+1 ; Put it back
+   0013     8020      17   LD SIZE ; Get size
+   0015     5021      18   - ONE ; Subtract 1
+   0017     9020      19   MM SIZE ; Put it back
+   0019     101D      21   JZ END ; Finish if size = 0
+   001B        9      22   JP LOOP
+   001D       BF      24   END OS /F ; End Program
+   001E        0      26   IADDR K 0
+   001F        0      27   K 0
+   0020        0      28   SIZE K 0
+   0021        1      29   ONE K 1
+                      30   # INIT
+```
+
+
+```
+loader.asm.labels LABEL TABLE FILE
+----------------------------------
+LABEL           VALUE
+INIT             0000
+IADDR            001E
+SIZE             0020
+LOOP             0009
+ONE              0021
+END              001D
+```
+
+Para invocar o loader, basta rodar o comando `$RUN <nome_do_arquivo.obj> [step]`, não
+se deve colocar os números .X após .obj, isso é tratado automaticamente pela VM e
+todos eles serão carregados pelo loader.
+
+> A opção `step` pode ser usada para executar uma instrução de cada vez, sendo necessário
+> apertar enter para continuar, porém ela só útil se o debug estiver ativado
+
+### Dumper
 
 ## Testes
+
+## Diagramas
 
 ## Arquivos

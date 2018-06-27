@@ -1,0 +1,23 @@
+dumper.lst LIST FILE
+---------------------
+ADDRESS   OBJECT    LINE   SOURCE
+                       1   @ /0030 
+   0030                3   INIT 
+   0030       32       4   LOOP CN /2 ; Activate Indirect Mode
+   0031     8046       5   LD INICIO ; Indirect load from current address
+   0033       C4       7   IO /4 ; Put Data, device = 0
+   0034     804B       9   LD SPACE 
+   0036       C4      10   IO /4 ; Put Space
+   0037     8047      12   LD INICIO+1 ; Get inicio
+   0039     404A      13   + ONE ; Sum 1
+   003B     9047      14   MM INICIO+1 ; Put it back
+   003D     8046      16   LD INICIO 
+   003F     5048      17   - FIM 
+   0041     1045      18   JZ END 
+   0043       30      20   JP LOOP 
+   0045       BF      22   END OS /F ; End Program
+   0046               24   INICIO $ 2 
+   0048               25   FIM $ 2 
+   004A        1      26   ONE K 1 
+   004B       20      27   SPACE K 32 
+                      28   # INIT 

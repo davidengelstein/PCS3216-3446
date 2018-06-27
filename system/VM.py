@@ -139,8 +139,6 @@ class VM:
             if step:
                 input()
 
-        logger.debug('Value on 0x1200: %04X (acc = %02X)', self.main_memory[1][0x200].value, self.accumulator)
-
     def fetch(self):
         logger.debug('Fetching Instruction %04X', self.instruction_counter)
         logger.debug('Bank %d - PC: %X', self.current_bank, self.instruction_counter)

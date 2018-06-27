@@ -174,8 +174,8 @@ class Assembler:
             if operation == '@':
                 if operator > 0xFFFF:
                     raise AssemblyError('Assembly error on line {:d}: operator out of range "{:0x}"'.format(lineno, operator))
-                elif operator < 0x0100:
-                    raise AssemblyError('Assembly error on line {:d}: memory area before 0x0100 should never be accessed'.format(lineno))
+                # elif operator < 0x0100:
+                #     raise AssemblyError('Assembly error on line {:d}: memory area before 0x0100 should never be accessed'.format(lineno))
                 self.list(line=lineno, code=code, comment=comment)
                 if self.step == 2 and self.instruction_counter != None: # New code block, save current
                     self.save_obj()

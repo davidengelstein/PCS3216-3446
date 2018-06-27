@@ -1,0 +1,10 @@
+dumper.asm.labels LABEL TABLE FILE
+----------------------------------
+LABEL           VALUE
+INIT             0030
+LOOP             0030
+INICIO           0046
+SPACE            004B
+ONE              004A
+FIM              0048
+END              0045

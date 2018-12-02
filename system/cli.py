@@ -2,9 +2,13 @@
 
 import os
 import sys
+import random
 
 from .assembler import Assembler, AssemblyError
 from .VM import VM, VMError
+from .SO import SO
+from .job import Job
+from .event import KillProcessEvent
 
 from passlib.hash import bcrypt
 from prompt_toolkit import prompt
@@ -18,7 +22,9 @@ style = Style.from_dict({
 })
 
 class Interpreter:
-    def __init__(self):
+    def __init__(self, args):
+        self.args = args
+
         self.current_user = None
         self.current_dir = None
 
@@ -27,6 +33,8 @@ class Interpreter:
         self.user_path = 'users'
 
         self.vm = VM()
+        self.so = SO(args.max_jobs)
+        self.job_ids = 0
 
         self.commands = {
             '$RUN': 'Executa um arquivo OBJ',
@@ -34,7 +42,13 @@ class Interpreter:
             '$END': 'Encerra o interpretador',
             '$LOGOUT': 'Volta para o login',
             '$DEL': 'Marca um arquivo para remoção',
-            '$DIR': 'Mostra os arquivos na pasta'
+            '$DIR': 'Mostra os arquivos na pasta',
+        }
+
+        self.os_commands = {
+            '$ADD': 'Adiciona jobs ao SO para simulação',
+            '$KILL': 'Interrompe um job que esteja em execução no SO',
+            '$LIST': 'Lista os IDs dos jobs em execução ou prontos para execução'
         }
 
     def start(self):
@@ -64,7 +78,7 @@ class Interpreter:
                 while len(cmd) == 0:
                     cmd = prompt(prompt_fragments, style=style).split()
 
-                if cmd[0] not in self.commands:
+                if cmd[0] not in [*self.commands, *self.os_commands]:
                     self._usage()
                     continue
 
@@ -100,11 +114,38 @@ class Interpreter:
 
                     self._del(cmd[1])
 
+                elif cmd[0] == '$ADD':
+                    if len(cmd) < 2:
+                        print('Usage: $ADD <cycles> <amount>')
+                        continue
+                    try:
+                        for _ in range(int(cmd[2])):
+                            self._add_job(int(cmd[1]))
+                    except IndexError:
+                        self._add_job(int(cmd[1]))
+
+                elif cmd[0] == '$KILL':
+                    if len(cmd) < 2:
+                        print('Usage: $KILL <job_id>')
+                        continue
+
+                    kill_evt = KillProcessEvent(int(cmd[1]))
+                    self.so.event_queue.put(kill_evt)
+
+                elif cmd[0] == '$LIST':
+                    for j in [*self.so.active_jobs, *self.so.waiting_io_jobs, *self.so.ready_jobs]:
+                        print(f'Job {j.id} - {j.state.name}')
+
                 print()
 
     def _usage(self):
         print('Comando Inválido!')
+        print('Comandos da Simulação Original da VM:')
         for k, v in self.commands.items():
+            print('    {}: {}'.format(k, v))
+        print()
+        print('Comandos da Simulação do SO:')
+        for k, v in self.os_commands.items():
             print('    {}: {}'.format(k, v))
         print()
 
@@ -187,6 +228,22 @@ class Interpreter:
             print('Assembly terminado!')
         except AssemblyError as e:
             print('Error:', e)
+
+    def _add_job(self, run_time):
+        has_io = bool(random.randint(0, 1))
+
+        try:
+            io_start_time = random.randint(2, run_time - 1) if has_io else 0
+        except ValueError:
+            has_io = False
+            io_start_time = 0
+
+        io_duration = random.randint(10, 100) if has_io else 0
+
+        new_job = Job(self.job_ids, run_time, io=(has_io, io_start_time, io_duration))
+        self.job_ids += 1
+
+        self.so.add_job(new_job)
 
     def end(self):
         print('Cleaning up!')

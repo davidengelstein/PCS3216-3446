@@ -37,18 +37,18 @@ class Interpreter:
         self.job_ids = 0
 
         self.commands = {
-            '/run': 'Executa um arquivo .obj',
-            '/asm': 'Monta um arquivo .asm',
-            '/end': 'Encerra o interpretador',
-            '/logout': 'Volta para o login',
-            '/del': 'Marca um arquivo para remoção',
-            '/ls': 'Mostra os arquivos no diretório do usuário',
+            'run': 'Executa um arquivo .obj',
+            'asm': 'Monta um arquivo .asm',
+            'end': 'Encerra o interpretador',
+            'logout': 'Volta para o login',
+            'del': 'Marca um arquivo para remoção',
+            'ls': 'Mostra os arquivos no diretório do usuário',
         }
 
         self.os_commands = {
-            '/add': 'Adiciona jobs ao SO para simulação',
-            '/kill': 'Interrompe um job que esteja em execução no SO',
-            '/list': 'Lista os IDs dos jobs em execução ou prontos para execução'
+            'add': 'Adiciona jobs ao SO para simulação',
+            'kill': 'Interrompe um job que esteja em execução no SO',
+            'jobs': 'Lista os IDs dos jobs em execução ou prontos para execução'
         }
 
     def start(self):
@@ -83,41 +83,41 @@ class Interpreter:
                     self._usage()
                     continue
 
-                if cmd[0] == '/ls':
+                if cmd[0] == 'ls':
                     self._dir()
 
-                elif cmd[0] == '/run':
+                elif cmd[0] == 'run':
                     if len(cmd) < 2:
-                        print('Uso: /run <arquivo>')
+                        print('Uso: run <arquivo>')
                         continue
 
                     self._run(cmd[1], len(cmd) >= 3 and cmd[2] == 'step')
 
-                elif cmd[0] == '/logout':
+                elif cmd[0] == 'logout':
                     self._logout()
                     print()
                     break
 
-                elif cmd[0] == '/end':
+                elif cmd[0] == 'end':
                     self.end()
 
-                elif cmd[0] == '/asm':
+                elif cmd[0] == 'asm':
                     if len(cmd) < 2:
-                        print('Uso: /asm <arquivo>')
+                        print('Uso: asm <arquivo>')
                         continue
 
                     self._asm(cmd[1])
 
-                elif cmd[0] == '/del':
+                elif cmd[0] == 'del':
                     if len(cmd) < 2:
-                        print('Uso: /del <arquivo>')
+                        print('Uso: del <arquivo>')
                         continue
 
                     self._del(cmd[1])
 
-                elif cmd[0] == '/add':
+                elif cmd[0] == 'add':
                     if len(cmd) < 2:
-                        print('Uso: /add <ciclos> <quantidade de jobs>')
+                        print('Uso: add <ciclos> <quantidade de jobs>')
                         continue
                     try:
                         for _ in range(int(cmd[2])):
@@ -125,15 +125,15 @@ class Interpreter:
                     except IndexError:
                         self._add_job(int(cmd[1]))
 
-                elif cmd[0] == '/kill':
+                elif cmd[0] == 'kill':
                     if len(cmd) < 2:
-                        print('Uso: /kill <job_id>')
+                        print('Uso: kill <job_id>')
                         continue
 
                     kill_evt = KillProcessEvent(int(cmd[1]))
                     self.so.event_queue.put(kill_evt)
 
-                elif cmd[0] == '/list':
+                elif cmd[0] == 'jobs':
                     for j in [*self.so.active_jobs, *self.so.waiting_io_jobs, *self.so.ready_jobs]:
                         print(f'Job {j.id} - {j.state.name}')
 

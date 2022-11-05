@@ -37,18 +37,18 @@ class Interpreter:
         self.job_ids = 0
 
         self.commands = {
-            '$RUN': 'Executa um arquivo OBJ',
-            '$ASM': 'Monta um arquivo ASM',
-            '$END': 'Encerra o interpretador',
-            '$LOGOUT': 'Volta para o login',
-            '$DEL': 'Marca um arquivo para remoção',
-            '$DIR': 'Mostra os arquivos na pasta',
+            '/run': 'Executa um arquivo .obj',
+            '/asm': 'Monta um arquivo .asm',
+            '/end': 'Encerra o interpretador',
+            '/logout': 'Volta para o login',
+            '/del': 'Marca um arquivo para remoção',
+            '/ls': 'Mostra os arquivos no diretório do usuário',
         }
 
         self.os_commands = {
-            '$ADD': 'Adiciona jobs ao SO para simulação',
-            '$KILL': 'Interrompe um job que esteja em execução no SO',
-            '$LIST': 'Lista os IDs dos jobs em execução ou prontos para execução'
+            '/add': 'Adiciona jobs ao SO para simulação',
+            '/kill': 'Interrompe um job que esteja em execução no SO',
+            '/list': 'Lista os IDs dos jobs em execução ou prontos para execução'
         }
 
     def start(self):
@@ -56,7 +56,7 @@ class Interpreter:
             print('Inicializado. Digite [l]ogin ou [r]egistrar')
 
             while self.current_user is None:
-                cmd = prompt('login >> ').lower()
+                cmd = prompt('> ').lower()
 
                 if cmd in ['l', 'login']:
                     self.login()
@@ -83,41 +83,41 @@ class Interpreter:
                     self._usage()
                     continue
 
-                if cmd[0] == '$DIR':
+                if cmd[0] == '/ls':
                     self._dir()
 
-                elif cmd[0] == '$RUN':
+                elif cmd[0] == '/run':
                     if len(cmd) < 2:
-                        print('Uso: $RUN <file>')
+                        print('Uso: /run <arquivo>')
                         continue
 
                     self._run(cmd[1], len(cmd) >= 3 and cmd[2] == 'step')
 
-                elif cmd[0] == '$LOGOUT':
+                elif cmd[0] == '/logout':
                     self._logout()
                     print()
                     break
 
-                elif cmd[0] == '$END':
+                elif cmd[0] == '/end':
                     self.end()
 
-                elif cmd[0] == '$ASM':
+                elif cmd[0] == '/asm':
                     if len(cmd) < 2:
-                        print('Uso: $RUN <file>')
+                        print('Uso: /asm <arquivo>')
                         continue
 
                     self._asm(cmd[1])
 
-                elif cmd[0] == '$DEL':
+                elif cmd[0] == '/del':
                     if len(cmd) < 2:
-                        print('Uso: $DEL <file>')
+                        print('Uso: /del <arquivo>')
                         continue
 
                     self._del(cmd[1])
 
-                elif cmd[0] == '$ADD':
+                elif cmd[0] == '/add':
                     if len(cmd) < 2:
-                        print('Uso: $ADD <cycles> <amount>')
+                        print('Uso: /add <ciclos> <quantidade de jobs>')
                         continue
                     try:
                         for _ in range(int(cmd[2])):
@@ -125,15 +125,15 @@ class Interpreter:
                     except IndexError:
                         self._add_job(int(cmd[1]))
 
-                elif cmd[0] == '$KILL':
+                elif cmd[0] == '/kill':
                     if len(cmd) < 2:
-                        print('Uso: $KILL <job_id>')
+                        print('Uso: /kill <job_id>')
                         continue
 
                     kill_evt = KillProcessEvent(int(cmd[1]))
                     self.so.event_queue.put(kill_evt)
 
-                elif cmd[0] == '$LIST':
+                elif cmd[0] == '/list':
                     for j in [*self.so.active_jobs, *self.so.waiting_io_jobs, *self.so.ready_jobs]:
                         print(f'Job {j.id} - {j.state.name}')
 
@@ -251,4 +251,5 @@ class Interpreter:
         for p in os.scandir():
             if p.name.endswith('.to_delete'):
                 os.remove(p)
+        print("OK.")
         sys.exit(0)

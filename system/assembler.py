@@ -54,7 +54,7 @@ class Assembler:
             logger.error('File %s not found', filen)
             raise AssemblyError('File not found')
         except UnicodeDecodeError:
-            raise AssemblyError('Certifique-se que não há letras acentuadas no arquivo!')
+            raise AssemblyError('Make sure there are only ASCII characters on the file.')
 
         logger.debug('Preprocessing file')
         self.lines = []

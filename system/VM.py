@@ -5,7 +5,7 @@ import sys
 
 from ctypes import c_uint8, c_uint16, c_int8
 
-fmt = '[{levelname:7s}] {name:s}: {message:s}'
+fmt = '!{levelname:10s}! {name:s} | {message:s}'
 logger = logging.getLogger(__name__)
 coloredlogs.DEFAULT_FIELD_STYLES['levelname']['color'] = 'white'
 
@@ -64,19 +64,19 @@ class VM:
 
         self.loading = False
 
-        logger.debug('Loading loader')
+        logger.debug('Carregando loader')
         with open('system/loader.obj.0', 'r') as f:
             bs = f.read().split()
 
             addr = int(bs[0], 16) << 8 | int(bs[1], 16)
             s = int(bs[2], 16)
-            logger.debug('Initial loader save address: %04X', addr)
-            logger.debug('Amount of bytes: %02X', s)
+            logger.debug('Endereço inicial do Loader: %04X', addr)
+            logger.debug('Bytes: %02X', s)
 
             for b in bs[3:3+s]:
                 self.main_memory[addr >> 12][addr & 0xFFF].value = int(b, 16)
                 addr += 1
-        logger.debug('Loader loaded')
+        logger.debug('Loader carregado!')
 
 
     @property
@@ -102,7 +102,7 @@ class VM:
     @accumulator.setter
     def accumulator(self, value):
         self._acc.value = value
-        logger.debug('Accumulator: %+03X (%d)', self._acc.value, self._acc.value)
+        logger.debug('Acumulador= %+03X (%d)', self._acc.value, self._acc.value)
 
     @property
     def current_bank(self):
@@ -114,9 +114,9 @@ class VM:
 
     def load(self, filen):
         self.loading = True
-        logger.debug('Loading file to memory')
+        logger.debug('Carregando arquivo an Memória')
         for fn in glob.glob(filen + '.bin.*'):
-            logger.debug('Changing file - %s', fn)
+            logger.debug('Mudando arquivo - %s', fn)
             self.io_devices[1][0] = open(fn, 'rb')
             self.instruction_counter = 0x0000 # loader starts at 0
 
@@ -211,7 +211,7 @@ class VM:
         logger.debug('Control Operation {:d}'.format(operand))
 
         if operand == 0: # Halt Machine
-            logger.warning('Machine Halted! Press ctrl+C to interrupt execution!')
+            logger.warning('Operação finalizada, pressione CTRL-C para continuar.')
             try:
                 while True:
                     pass

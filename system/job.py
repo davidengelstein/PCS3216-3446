@@ -43,6 +43,6 @@ class Job:
 
     def cycle(self):
         self.current_cycle += 1
-        logger.info(f'Job {self.id} running cycle {self.current_cycle} of {self.total_cycles}.')
+        logger.info(f'Job {self.id} rodando ({self.current_cycle}/{self.total_cycles} ciclos).')
         if self.current_cycle == self.total_cycles:
             self.state = JobState.DONE

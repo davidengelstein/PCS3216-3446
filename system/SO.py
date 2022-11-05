@@ -24,9 +24,9 @@ class SO:
         self.multiprogramming = multiprogramming
         self.current_cycle = 0
 
-        logger.info(f'[{self.current_cycle:05d}] Initializing Job Scheduler')
-        logger.info(f'[{self.current_cycle:05d}] Initializing Process Scheduler')
-        logger.info(f'[{self.current_cycle:05d}] Initializing Traffic Controller')
+        logger.info(f'Ciclo {self.current_cycle:05d} | Inicializando Job Scheduler')
+        logger.info(f'Ciclo {self.current_cycle:05d} | Inicializando Traffic Controller')
+        logger.info(f'Ciclo {self.current_cycle:05d} | Inicializando Process Scheduler')
 
         self.schedulers = threading.Thread(target=self._schedulers)
         self.processor = threading.Thread(target=self._run)
@@ -44,7 +44,7 @@ class SO:
         event_name = type(event).__name__
 
         if type(event) == IOFinishedEvent:
-            logger.info(f'[{self.current_cycle:05d}] SO: Processing event {event_name} for Job {event.job_id}.')
+            logger.info(f'Ciclo {self.current_cycle:05d} | SO | Evento de I/O ({event_name}) para o job {event.job_id}.')
             event.process()
 
             for j in self.waiting_io_jobs[:]:
@@ -55,7 +55,7 @@ class SO:
                     return
 
         if type(event) == KillProcessEvent:
-            logger.info(f'[{self.current_cycle:05d}] SO: Processing event {event_name} for Job {event.job_id}.')
+            logger.info(f'Ciclo {self.current_cycle:05d} | SO | Matar job {event.job_id}.')
             event.process()
 
             for j in self.waiting_io_jobs[:]:
@@ -77,25 +77,25 @@ class SO:
                     j.state = JobState.DONE
                     return
 
-        logger.warning(f'[{self.current_cycle:05d}] SO: Unknown event {event_name}')
+        logger.warning(f'Ciclo {self.current_cycle:05d} | SO | Evento Desconhecido... {event_name}')
 
     def _job_scheduler(self):
         try:
-            new_job = self.jobs_queue.get(False)  # Get job from Priority Queue
+            new_job = self.jobs_queue.get(False) 
         except Empty:
             return
 
-        logger.info(f'[{self.current_cycle:05d}] Job Scheduler: Job {new_job.id} now READY after {self.current_cycle - new_job.arrive_time} cycles.')
+        logger.info(f'Ciclo {self.current_cycle:05d} | Job Scheduler | Job {new_job.id} está PRONTO (delay: {self.current_cycle - new_job.arrive_time} ciclos)')
         new_job.state = JobState.READY
         new_job.start_time = self.current_cycle
-        self.ready_jobs.append(new_job)  # Add job to active jobs list
+        self.ready_jobs.append(new_job)  
 
     def _process_scheduler(self):
         for job in self.ready_jobs[:]:
             if self.running_jobs >= self.multiprogramming:
                 continue
 
-            logger.info(f'[{self.current_cycle:05d}] Process Scheduler: Starting job {job.id} after {self.current_cycle - job.arrive_time} cycles')
+            logger.info(f'Ciclo {self.current_cycle:05d} | Process Scheduler | Iniciando job {job.id} (delay: {self.current_cycle - job.arrive_time} ciclos)')
             self.ready_jobs.remove(job)
             job.state = JobState.RUNNING
             self.running_jobs += 1
@@ -106,9 +106,9 @@ class SO:
 
     def add_job(self, job: Job):
         if job.io[0]:
-            logger.info(f'[{self.current_cycle:05d}] SO: Received Job (id {job.id}) with {job.priority.name} priority and I/O on cycle {job.io[1]}|{job.io[2]}. Adding to queue.')
+            logger.info(f'Ciclo {self.current_cycle:05d} | SO | Adicionando job (id {job.id}) com prioridade {job.priority.name} à fila com E/S no ciclo {job.io[1]}|{job.io[2]}.')
         else:
-            logger.info(f'[{self.current_cycle:05d}] SO: Received Job (id {job.id}) with {job.priority.name} priority and no I/O. Adding to queue.')
+            logger.info(f'Ciclo {self.current_cycle:05d} | SO | Adicionando job (id {job.id}) com prioridade {job.priority.name} à fila.')
         job.state = JobState.WAIT_RESOURCES
         job.arrive_time = self.current_cycle
         self.jobs_queue.put(job)
@@ -142,7 +142,7 @@ class SO:
                 job.cycle()
 
                 if job.io[0] and job.current_cycle == job.io[1]:
-                    logger.info(f'[{self.current_cycle:05d}] SO: Job {job.id} requesting I/O operation.')
+                    logger.info(f'Ciclo {self.current_cycle:05d} | SO | Job {job.id} aguardando E/S.')
                     t = threading.Timer(0.1 * job.io[2], self.io_finish, [job.id])
                     job.state = JobState.WAIT_IO
 
@@ -153,7 +153,7 @@ class SO:
                     t.start()
 
                 if job.state == JobState.DONE:
-                    logger.info(f'[{self.current_cycle:05d}] SO: Job {job.id} finished after {self.current_cycle - job.start_time} cycles.')
+                    logger.info(f'Ciclo {self.current_cycle:05d} | SO | Job {job.id} terminado (delay: {self.current_cycle - job.start_time} ciclos).')
 
                     self.running_jobs -= 1
                     self.active_jobs.remove(job)

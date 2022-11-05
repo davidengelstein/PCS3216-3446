@@ -21,7 +21,7 @@ class IOFinishedEvent(Event):
         self.job_id = job_id
 
     def process(self):
-        logger.info(f'Job {self.job_id} I/O event finished.')
+        logger.info(f'Job {self.job_id} evento de E/S concluído.')
 
 class KillProcessEvent(Event):
     def __init__(self, job_id):
@@ -29,4 +29,4 @@ class KillProcessEvent(Event):
         self.job_id = job_id
 
     def process(self):
-        logger.info(f'Job {self.job_id} killed.')
+        logger.info(f'Job {self.job_id} matado.')
